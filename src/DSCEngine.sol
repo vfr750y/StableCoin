@@ -24,7 +24,7 @@
 pragma solidity ^0.8.19;
 
 import {DecentralizedStableCoin} from "./DecentralizedStableCoin.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
@@ -32,16 +32,15 @@ import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/Ag
  * * @title DSCEngine
  * * @author Ajay Curry
  * *
- * * The system is designed to be as minimal as possible, and have the tokens maintain a 1 token == $1 peg
+ * * The system is designed to be as minimal as possible, and have the tokens maintain a 1 token == $1 USD peg
  * * This stablecoin has the properties
- * * - Exogenous Collateral
- *
- * - dollar Pegged
- * Algorithmically Stable
+ * - Exogenous Collateral
+ * - US Dollar Pegged
+ * - Algorithmically Stable
  * It is similar to DAI if DAI had no gevernance, no fees, and was only backed by WETH and WBTC.
- * DSC system should always be "overcollateralized"
- * @notice This contract is the core of the DSC SYstem. It handles all the logic for mining and redeeming DSC, as well as depoisiting & withdrawing collateral.
- * @notice This contract is VERY losely based on the MAkerDAO DSS (DAI) system.
+ * The DSC system should always be "overcollateralized"
+ * @notice This contract is the core of the DSC System. It handles all the logic for mining and redeeming DSC, as well as depositing & withdrawing collateral.
+ * @notice This contract is VERY losely based on the MakerDAO DSS (DAI) system.
  */
 contract DSCEngine is ReentrancyGuard {
     /////////////////////////
@@ -55,7 +54,7 @@ contract DSCEngine is ReentrancyGuard {
     error DSCEngine__MintFailed();
 
     /////////////////////////
-    //  State variables           //
+    //  State variables     //
     /////////////////////////
 
     uint256 private constant ADDITIONAL_FEED_PRECISION = 1e10;
@@ -201,9 +200,10 @@ contract DSCEngine is ReentrancyGuard {
         }
     }
 
-    /////////////////////////////////////
+    ///////////////////////////////////////
     //  Pulic and Exernal View functions //
-    /////////////////////////////////////
+    ///////////////////////////////////////
+
     function getAccountCollateralValue(address user) public view returns (uint256 totalCollateralValueInUsd) {
         // loop through each collateral token, get the amount they have deposited, and map it to
         // the price, to get the USD value

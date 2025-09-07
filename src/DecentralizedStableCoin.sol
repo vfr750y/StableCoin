@@ -28,11 +28,11 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 /* @title DecentralizedStableCoin
  * @author Ajay Curry
- * Anchored to USD
+ * Value is anchored to USD
  * Stability Mechanism (Minting): Algorithmic (Decentralized)
  * Collateral: Exongenous (Crypto) - ETH and BTC
  *
- * This is the contract meant ot be governed by DSCEngine. This contract is just the ERC20 implementation of our stablecoin system.
+ * This is the contract meant to be governed by DSCEngine. This contract is just the ERC20 implementation of our stablecoin system.
  */
 contract DecentralizedStableCoin is ERC20Burnable, Ownable {
     error DecentralizedStableCoin__AmountMustBeMoreThanZero();
@@ -47,9 +47,9 @@ contract DecentralizedStableCoin is ERC20Burnable, Ownable {
     Related code changes can be viewed in this commit:
     https://github.com/OpenZeppelin/openzeppelin-contracts/commit/13d5e0466a9855e9305119ed383e54fc913fdc60
     */
-    //constructor() ERC20("DecentralizedStableCoin", "DSC") {}
+    constructor() ERC20("DecentralizedStableCoin", "DSC") {} // ** BEFORE 0.8.20 ***
 
-    constructor() ERC20("DecentralizedStableCoin", "DSC") Ownable(msg.sender) {}
+    //constructor() ERC20("DecentralizedStableCoin", "DSC") Ownable(msg.sender) {} // ** AFTER 0.8.20 **
 
     // In newer versions of OpenZeppelin contracts (e.g., versions compatible with Solidity >=0.8.20), the Ownable contract's constructor requires an initial owner address to be passed explicitly
     // OpenZeppelin Contracts 5.0.0 and later are compatible with Solidity versions ^0.8.20 (as specified in the package.json and contract source files, which use pragma solidity ^0.8.20).
@@ -66,10 +66,7 @@ contract DecentralizedStableCoin is ERC20Burnable, Ownable {
         super.burn(_amount);
     }
 
-    function mint(
-        address _to,
-        uint256 _amount
-    ) external onlyOwner returns (bool) {
+    function mint(address _to, uint256 _amount) external onlyOwner returns (bool) {
         if (_to == address(0)) {
             revert DecentralizedStableCoin__NotZeroAddress();
         }

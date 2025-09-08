@@ -76,10 +76,11 @@ contract DSCEngine is ReentrancyGuard {
     /////////////////////////
 
     event CollateralDeposited(address indexed user, address indexed token, uint256 amount);
-
+    event CollateralRedeemed(address indexed user, address indexed token, uint256 amount);
     ////////////////////////////
     //  Modifiers             //
     ////////////////////////////
+
     modifier moreThanZero(uint256 amount) {
         if (amount == 0) {
             revert DSCEngine__NeedsMoreThanZero();
@@ -114,7 +115,13 @@ contract DSCEngine is ReentrancyGuard {
     ////////////////////////////
     //  External functions    //
     ////////////////////////////
-
+    /**
+     *
+     * @param tokenCollateralAddress The address fo the token to deposit as collateral
+     * @param amountCollateral Tje amount of collateral to deposit
+     * @param amountDscToMint The amount of Dsc to mint
+     * @notice this function will depostir your callaeral and mint in one transaction
+     */
     function depositCollateralAndMintDsc(
         address tokenCollateralAddress,
         uint256 amountCollateral,
@@ -146,7 +153,21 @@ contract DSCEngine is ReentrancyGuard {
 
     function redeemCollateralForDsc() external {}
 
-    function redeemCollateral() external {}
+    // health factor must be over 1 after collateral pulled
+    function redeemCollateral(address tokenCollateralAddress, uint256 amountCollateral)
+        external
+        moreThanZero(amountCollateral)
+        nonReentrant
+    {
+        s_collateralDeposited[msg.sender][tokenCollateralAddress] -= amountCollateral;
+        emit CollateralRedeemed(msg.sender, tokenCollateralAddress, amountCollateral);
+        bool success = IERC20(tokenCollateralAddress).transfer(msg.sender, amountCollateral);
+        if (!success) {
+            revert DSCEngine__TransferFailed();
+        }
+        _revertIfHealthFactorIsBroken(msg.sender);
+    }
+
     // 1. Check if the collateral value > DCS amount
     /**
      *
@@ -154,7 +175,6 @@ contract DSCEngine is ReentrancyGuard {
      * @notice follows CEI
      * @notice they must have more collateral value than the minum threshold
      */
-
     function mintDsc(uint256 amountDscToMint) public moreThanZero(amountDscToMint) nonReentrant {
         s_DSCMinted[msg.sender] += amountDscToMint;
         _revertIfHealthFactorIsBroken(msg.sender);

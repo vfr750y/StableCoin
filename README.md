@@ -6,6 +6,7 @@ Stablecoin project
 
 2. Stability Mechanism (Minting): Algorithmic (Decentralized)
     1. People can only mint stablecoin with enough collateral (coded)
+    
 3. Collateral: Exongenous (Crypto) - ETH and BTC
     1. wETH
     2. wBTC

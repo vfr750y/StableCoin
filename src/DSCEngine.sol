@@ -209,7 +209,7 @@ contract DSCEngine is ReentrancyGuard {
 
     function liquidate() external {}
 
-    function healthFactor() external view {}
+    function getHealthFactor() external view {}
 
     /////////////////////////////////////
     //  Private and internal functions //

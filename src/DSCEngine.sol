@@ -59,7 +59,7 @@ contract DSCEngine is ReentrancyGuard {
 
     uint256 private constant ADDITIONAL_FEED_PRECISION = 1e10;
     uint256 private constant PRECISON = 1e18;
-    uint256 private constant LIQUIDATION_THRESHOLD = 50;
+    uint256 private constant LIQUIDATION_THRESHOLD = 50; // 200% over collateralized
     uint256 private constant LIQUIDATION_PRECISION = 100;
     uint256 private constant MIN_HEALTH_FACTOR = 1;
 
@@ -234,6 +234,12 @@ contract DSCEngine is ReentrancyGuard {
         // total collateral value
         (uint256 totalDscMinted, uint256 collateralValueInUsd) = _getAccountInformation(user);
         uint256 collaterlAdjustedForThreshold = (collateralValueInUsd * LIQUIDATION_THRESHOLD) / LIQUIDATION_PRECISION;
+        // Examples of health factor
+        // A user has $1000 of ETH and has minted $100 of DSC (100 DSC)
+        // 1000 * 50 = 50000
+        // 50000 / 100 = 500
+        // 500 / 100 = 5
+
         return (collaterlAdjustedForThreshold * PRECISON) / totalDscMinted;
 
         //return (collateralValueInUsd / totalDscMinted);
@@ -242,6 +248,7 @@ contract DSCEngine is ReentrancyGuard {
     function _revertIfHealthFactorIsBroken(address user) internal view {
         // Check health factor - checks to see if the user has enough collateral
         // revert if health factor is bad
+        // in above example health factor is 5 which is good.abi
         uint256 userHealthFactor = _healthFactor(user);
         if (userHealthFactor < MIN_HEALTH_FACTOR) {
             revert DSCEngine__BreaksHealthFactor(userHealthFactor);
@@ -266,6 +273,7 @@ contract DSCEngine is ReentrancyGuard {
     function getUsdValue(address token, uint256 amount) public view returns (uint256) {
         AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[token]);
         (, int256 price,,,) = priceFeed.latestRoundData();
+        // ETH/USD and BTC/USD from Chainlink both return values in 8 decimal places (1e8)
         return ((uint256(price) * ADDITIONAL_FEED_PRECISION) * amount) / PRECISON;
     }
 }

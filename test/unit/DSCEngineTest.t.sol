@@ -28,7 +28,7 @@ contract DSCEngineTest is Test {
         ERC20Mock(weth).mint(USER, STARTING_ERC20_BALANCE);
     }
 
-    /////////////////////
+    /////////////////////////
     // Price Test ///////////
     /////////////////////////
     function testGetUsdValue() public {
@@ -37,9 +37,9 @@ contract DSCEngineTest is Test {
         uint256 actualUsd = dsce.getUsdValue(weth, ethAmount);
         assertEq(expectedUsd, actualUsd);
     }
-    /////////////////////
-    // PDeposit Collateral TEsts ///////////
-    /////////////////////////
+    ///////////////////////////////////////
+    // Deposit Collateral Tests ///////////
+    ///////////////////////////////////////
 
     function testRevertIfCollateralZero() public {
         vm.startPrank(USER);

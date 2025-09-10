@@ -63,7 +63,7 @@ contract DSCEngine is ReentrancyGuard {
     uint256 private constant LIQUIDATION_PRECISION = 100;
     uint256 private constant MIN_HEALTH_FACTOR = 1;
 
-    mapping(address => address priceFeed) private s_priceFeeds;
+    mapping(address token => address priceFeed) private s_priceFeeds;
     mapping(address user => mapping(address token => uint256 amount)) private s_collateralDeposited;
     mapping(address user => uint256 amountDscMinted) private s_DSCMinted;
 
@@ -117,8 +117,8 @@ contract DSCEngine is ReentrancyGuard {
     ////////////////////////////
     /**
      *
-     * @param tokenCollateralAddress The address fo the token to deposit as collateral
-     * @param amountCollateral Tje amount of collateral to deposit
+     * @param tokenCollateralAddress The address of the ERC20 token where the collateral comes from
+     * @param amountCollateral The amount of collateral to deposit
      * @param amountDscToMint The amount of Dsc to mint
      * @notice this function will depostir your callaeral and mint in one transaction
      */
@@ -132,9 +132,9 @@ contract DSCEngine is ReentrancyGuard {
     }
     /**
      * @notice follows Checks Effects Interactions
-     * @param tokenCollateralAddress The address fo the token to deposit as collateral
+     * @param tokenCollateralAddress The address of the token contract to deposit as collateral e.g. WETH or WBTC on Sepolia or Mainnet or Anvil (mocks)
      *
-     * @param amountCollateral THe amount of collateral to deposit
+     * @param amountCollateral The amount of collateral to deposit
      */
 
     function depositCollateral(address tokenCollateralAddress, uint256 amountCollateral)

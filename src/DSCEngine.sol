@@ -225,8 +225,8 @@ contract DSCEngine is ReentrancyGuard {
     }
 
     /**
-     * returns how close to liquidation a user is
-     * If a user goes below 1 then they cant get liquidated
+     * Returns how close to liquidation a user is
+     * If a user goes below 1 then they can get liquidated
      *
      */
     function _healthFactor(address user) private view returns (uint256) {
@@ -240,7 +240,7 @@ contract DSCEngine is ReentrancyGuard {
     }
 
     function _revertIfHealthFactorIsBroken(address user) internal view {
-        // Check health factor
+        // Check health factor - checks to see if the user has enough collateral
         // revert if health factor is bad
         uint256 userHealthFactor = _healthFactor(user);
         if (userHealthFactor < MIN_HEALTH_FACTOR) {

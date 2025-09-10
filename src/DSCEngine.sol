@@ -181,7 +181,7 @@ contract DSCEngine is ReentrancyGuard {
         _revertIfHealthFactorIsBroken(msg.sender);
     }
 
-    // 1. Check if the collateral value > DCS amount
+    // 1. Check if the collateral value > DSC amount
     /**
      *
      * @param amountDscToMint Amount of DSC to mint.

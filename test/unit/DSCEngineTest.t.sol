@@ -32,7 +32,7 @@ contract DSCEngineTest is Test {
     // Price Test ///////////
     /////////////////////////
     function testGetUsdValue() public {
-        uint256 ethAmount = 15e18; // Example 15 ETH * 2000 USD = 30000 USD
+        uint256 ethAmount = 15e18; // Example 15 ETH * 2000 USD = 30000 USD this is from ETH_USD_PRICE in HelperConfig
         uint256 expectedUsd = 30000e18;
         uint256 actualUsd = dsce.getUsdValue(weth, ethAmount);
         assertEq(expectedUsd, actualUsd);

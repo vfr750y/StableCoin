@@ -78,7 +78,9 @@ contract DSCEngine is ReentrancyGuard {
     /////////////////////////
 
     event CollateralDeposited(address indexed user, address indexed token, uint256 amount);
-    event CollateralRedeemed(address indexed user, address indexed token, uint256 amount);
+    event CollateralRedeemed(
+        address indexed redeemedFrom, address indexed redeemedTo, address indexed token, uint256 amount
+    );
     ////////////////////////////
     //  Modifiers             //
     ////////////////////////////
@@ -174,12 +176,8 @@ contract DSCEngine is ReentrancyGuard {
         moreThanZero(amountCollateral)
         nonReentrant
     {
-        s_collateralDeposited[msg.sender][tokenCollateralAddress] -= amountCollateral;
-        emit CollateralRedeemed(msg.sender, tokenCollateralAddress, amountCollateral);
-        bool success = IERC20(tokenCollateralAddress).transfer(msg.sender, amountCollateral);
-        if (!success) {
-            revert DSCEngine__TransferFailed();
-        }
+        _redeemCollateral(tokenCollateralAddress, amountCollateral, msg.sender, msg.sender);
+
         _revertIfHealthFactorIsBroken(msg.sender);
     }
 
@@ -240,6 +238,8 @@ contract DSCEngine is ReentrancyGuard {
         // Implement a feature to liquidate in the event the protocol is insolvent
         // and sweep extra amounts into a treasury
         uint256 bonusCollateral = (tokenAmountFromDebtCovered * LIQUIDATION_BONUS) / LIQUIDATION_PRECISION;
+        uint256 totalCollateralToRedeem = tokenAmountFromDebtCovered + bonusCollateral;
+        _redeemCollateral(collateral, totalCollateralToRedeem, user, msg.sender);
     }
 
     function getHealthFactor() external view {}
@@ -247,6 +247,16 @@ contract DSCEngine is ReentrancyGuard {
     /////////////////////////////////////
     //  Private and internal functions //
     /////////////////////////////////////
+    function _redeemCollateral(address tokenCollateralAddress, uint256 amountCollateral, address from, address to)
+        private
+    {
+        s_collateralDeposited[from][tokenCollateralAddress] -= amountCollateral;
+        emit CollateralRedeemed(from, to, tokenCollateralAddress, amountCollateral);
+        bool success = IERC20(tokenCollateralAddress).transfer(to, amountCollateral);
+        if (!success) {
+            revert DSCEngine__TransferFailed();
+        }
+    }
 
     function _getAccountInformation(address user)
         private

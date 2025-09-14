@@ -338,6 +338,6 @@ contract DSCEngine is ReentrancyGuard {
         //Amount of USD in Wei divided by price
         AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[token]);
         (, int256 price,,,) = priceFeed.latestRoundData();
-        (usdAmountInWei * PRECISON) / (uint256(price) * ADDITIONAL_FEED_PRECISION);
+        return ((usdAmountInWei * PRECISON) / (uint256(price) * ADDITIONAL_FEED_PRECISION));
     }
 }

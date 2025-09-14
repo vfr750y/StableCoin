@@ -63,6 +63,7 @@ contract DSCEngine is ReentrancyGuard {
     uint256 private constant LIQUIDATION_THRESHOLD = 50; // 200% over collateralized
     uint256 private constant LIQUIDATION_PRECISION = 100;
     uint256 private constant MIN_HEALTH_FACTOR = 1e18;
+    uint256 private constant LIQUIDATION_BONUS = 10; // i.e. a 10% bonus;
 
     mapping(address token => address priceFeed) private s_priceFeeds;
     mapping(address user => mapping(address token => uint256 amount)) private s_collateralDeposited;
@@ -234,6 +235,11 @@ contract DSCEngine is ReentrancyGuard {
         // Take their collateral
         // E.g. a bad user : $140 ETH, 100 DSC. - debt ToCover = $100. $100 of DSC = &&& ETH?
         uint256 tokenAmountFromDebtCovered = getTokenAmountFromUsd(collateral, debtToCover);
+
+        // Then give a 10% bonus in WETH
+        // Implement a feature to liquidate in the event the protocol is insolvent
+        // and sweep extra amounts into a treasury
+        uint256 bonusCollateral = (tokenAmountFromDebtCovered * LIQUIDATION_BONUS) / LIQUIDATION_PRECISION;
     }
 
     function getHealthFactor() external view {}

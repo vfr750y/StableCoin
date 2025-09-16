@@ -130,4 +130,17 @@ contract DSCEngineTest is Test {
         dsce.redeemCollateral(weth, 1 ether);
         vm.stopPrank();
     }
+
+    //////////////////////////////
+    //  Mint DSC Test   //////////
+    //////////////////////////////
+
+    function testRevertIfMintAmountIsZero() public {
+        vm.startPrank(USER);
+        vm.expectRevert(DSCEngine.DSCEngine__NeedsMoreThanZero.selector);
+        dsce.mintDsc(0);
+        vm.stopPrank();
+    }
+
+    function testCanMintDsc() public depositedCollateral {}
 }

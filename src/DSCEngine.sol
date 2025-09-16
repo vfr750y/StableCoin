@@ -296,6 +296,10 @@ contract DSCEngine is ReentrancyGuard {
         // 50000 / 100 = 500
         // 500 / 100 = 5
 
+        // @dev Health factor is infinite when debt = 0
+        if (totalDscMinted == 0) {
+            return type(uint256).max;
+        }
         return (collaterlAdjustedForThreshold * PRECISON) / totalDscMinted;
 
         //return (collateralValueInUsd / totalDscMinted);

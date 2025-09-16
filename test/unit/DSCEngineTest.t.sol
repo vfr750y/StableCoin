@@ -94,4 +94,40 @@ contract DSCEngineTest is Test {
         assertEq(totalDscMinted, expectedTotalDscMinted);
         assertEq(AMOUNT_COLLATERAL, expectedDepositAmount);
     }
+
+    /////////////////////////////////
+    //   Redeem collateral tests  ///
+    //////////////////////////////////
+
+    function testRevertIfRedeemAmountIsZero() public {
+        vm.startPrank(USER);
+        ERC20Mock(weth).approve(address(dsce), AMOUNT_COLLATERAL);
+        vm.expectRevert(DSCEngine.DSCEngine__NeedsMoreThanZero.selector);
+        dsce.redeemCollateral(weth, 0);
+        vm.stopPrank();
+    }
+
+    function testCanRedeemCollateral() public depositedCollateral {
+        vm.startPrank(USER);
+        uint256 amountToRedeem = 5 ether;
+        uint256 initialCollateralValue = dsce.getAccountCollateralValue(USER);
+        dsce.redeemCollateral(weth, amountToRedeem);
+        uint256 finalCollateralValue = dsce.getAccountCollateralValue(USER);
+        uint256 expectedCollateralValue = initialCollateralValue - dsce.getUsdValue(weth, amountToRedeem);
+        assertEq(finalCollateralValue, expectedCollateralValue);
+        assertEq(ERC20Mock(weth).balanceOf(USER), 5 ether);
+        vm.stopPrank();
+    }
+
+    function testRevertIfRedeemBreaksHealthFactor() public depositedCollateral {
+        vm.startPrank(USER);
+        // Mint DSC to make health factor critical
+        uint256 usdCollateralValue = dsce.getAccountCollateralValue(USER); // 10 ETH * 2000 = 20,000 USD
+        uint256 maxDscToMint = (usdCollateralValue * 50) / 100; // 50% of collateral value = 10,000 USD
+        dsce.mintDsc(maxDscToMint);
+        // Attempt to redeem all collateral, which should break health factor
+        vm.expectRevert(abi.encodeWithSelector(DSCEngine.DSCEngine__BreaksHealthFactor.selector, 0.9e18));
+        dsce.redeemCollateral(weth, 1 ether);
+        vm.stopPrank();
+    }
 }

@@ -142,5 +142,14 @@ contract DSCEngineTest is Test {
         vm.stopPrank();
     }
 
-    function testCanMintDsc() public depositedCollateral {}
+    function testCanMintDsc() public depositedCollateral {
+        vm.startPrank(USER);
+        uint256 amountDscToMint = 1000e18;
+        dsc.approve(address(dsce), amountDscToMint);
+        dsce.mintDsc(amountDscToMint);
+        (uint256 totalDscMinted,) = dsce.getAccountInformation(USER);
+        assertEq(totalDscMinted, amountDscToMint);
+        assertEq(dsc.balanceOf(USER), amountDscToMint);
+        vm.stopPrank();
+    }
 }

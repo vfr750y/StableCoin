@@ -125,7 +125,7 @@ contract DSCEngineTest is Test {
         uint256 usdCollateralValue = dsce.getAccountCollateralValue(USER); // 10 ETH * 2000 = 20,000 USD
         uint256 maxDscToMint = (usdCollateralValue * 50) / 100; // 50% of collateral value = 10,000 USD
         dsce.mintDsc(maxDscToMint);
-        // Attempt to redeem all collateral, which should break health factor
+        // Attempt to redeem some collateral, which should break health factor
         vm.expectRevert(abi.encodeWithSelector(DSCEngine.DSCEngine__BreaksHealthFactor.selector, 0.9e18));
         dsce.redeemCollateral(weth, 1 ether);
         vm.stopPrank();

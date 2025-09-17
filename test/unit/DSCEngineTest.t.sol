@@ -152,4 +152,53 @@ contract DSCEngineTest is Test {
         assertEq(dsc.balanceOf(USER), amountDscToMint);
         vm.stopPrank();
     }
+
+    function testRevertIfMintBreaksHealthFactor() public depositedCollateral {
+        vm.startPrank(USER);
+        uint256 excessiveDsc = 10001e18;
+        dsc.approve(address(dsce), excessiveDsc);
+        vm.expectRevert(abi.encodeWithSelector(DSCEngine.DSCEngine__BreaksHealthFactor.selector, 999900009999000099));
+        dsce.mintDsc(excessiveDsc);
+        vm.stopPrank();
+    }
+
+    ////////////////////////////////
+    // Burn DSC Tests    ///////////
+    ////////////////////////////////
+
+    function testRevertIfBurnAmountIsZero() public {
+        vm.startPrank(USER);
+        vm.expectRevert(DSCEngine.DSCEngine__NeedsMoreThanZero.selector);
+        dsce.burnDsc(0);
+        vm.stopPrank();
+    }
+
+    function testCanBurnDsc() public depositedCollateral {
+        vm.startPrank(USER);
+        // mint some DSC
+        uint256 amountDscToMint = 1000e18;
+        dsc.approve(address(dsce), amountDscToMint);
+        dsce.mintDsc(amountDscToMint);
+        // burn half
+        uint256 amountToBurn = 500e18;
+        dsc.approve(address(dsce), amountToBurn);
+        dsce.burnDsc(amountToBurn);
+        (uint256 totalDscMinted,) = dsce.getAccountInformation(USER);
+        assertEq(totalDscMinted, amountDscToMint - amountToBurn);
+        assertEq(dsc.balanceOf(USER), amountDscToMint - amountToBurn);
+        vm.stopPrank();
+    }
+    //
+
+    function testRevertIfBurnExceedsMinted() public depositedCollateral {
+        vm.startPrank(USER);
+        uint256 amountDscToMint = 1000e18;
+        dsc.approve(address(dsce), amountDscToMint);
+        dsce.mintDsc(amountDscToMint);
+        uint256 excessiveBurn = 1001e18;
+        dsc.approve(address(dsce), excessiveBurn);
+        vm.expectRevert(DecentralizedStableCoin.DecentralizedStableCoin__BurnAmountExceedsBalance.selector);
+        dsce.burnDsc(excessiveBurn);
+        vm.stopPrank();
+    }
 }

@@ -21,6 +21,7 @@ contract DSCEngineTest is Test {
     uint256 public constant STARTING_ERC20_BALANCE = 10 ether;
 
     address public USER = makeAddr("user");
+    address public LIQUIDATOR = makeAddr("liquidator");
 
     function setUp() public {
         deployer = new DeployDSC();
@@ -235,6 +236,19 @@ contract DSCEngineTest is Test {
         uint256 expectedCollateral = dsce.getTokenAmountFromUsd(weth, collateralValueInUsd);
         assertEq(totalDscMinted, amountDscToMint - amountDscToBurn);
         assertEq(expectedCollateral, AMOUNT_COLLATERAL - amountCollateralToRedeem);
+        vm.stopPrank();
+    }
+
+    //////////////////////////
+    // Liquidation Tests /////
+    //////////////////////////
+
+    function testDoNotLiquidateIfHealthFactorNotBroken() public depositedCollateral {
+        vm.startPrank(LIQUIDATOR);
+        uint256 debtToCover = 100e18;
+        dsc.approve(address(dsce), debtToCover);
+        vm.expectRevert(DSCEngine.DSCEngine__HealthFactorOk.selector);
+        dsce.liquidate(weth, USER, debtToCover);
         vm.stopPrank();
     }
 }

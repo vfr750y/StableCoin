@@ -54,6 +54,7 @@ contract DSCEngine is ReentrancyGuard {
     error DSCEngine__MintFailed();
     error DSCEngine__HealthFactorOk();
     error DSCEngine__HealthFactorNotImproved();
+    error DSCEngine__BurnAmountExceedsMinted();
 
     /////////////////////////
     //  State variables     //
@@ -252,6 +253,10 @@ contract DSCEngine is ReentrancyGuard {
     /////////////////////////////////////
 
     function _burnDsc(uint256 amountDscToBurn, address onBehalfOf, address dscFrom) private {
+        // check that the burn amount doesn’t exceed the minted amount
+        if (amountDscToBurn > s_DSCMinted[onBehalfOf]) {
+            revert DSCEngine__BurnAmountExceedsMinted();
+        }
         s_DSCMinted[onBehalfOf] -= amountDscToBurn;
         bool success = i_dsc.transferFrom(dscFrom, address(this), amountDscToBurn);
         if (!success) {

@@ -193,12 +193,28 @@ contract DSCEngineTest is Test {
     function testRevertIfBurnExceedsMinted() public depositedCollateral {
         vm.startPrank(USER);
         uint256 amountDscToMint = 1000e18;
-        dsc.approve(address(dsce), amountDscToMint);
+        //  dsc.approve(address(dsce), amountDscToMint);
         dsce.mintDsc(amountDscToMint);
         uint256 excessiveBurn = 1001e18;
-        dsc.approve(address(dsce), excessiveBurn);
-        vm.expectRevert(DecentralizedStableCoin.DecentralizedStableCoin__BurnAmountExceedsBalance.selector);
+        // dsc.approve(address(dsce), excessiveBurn);
+        vm.expectRevert(DSCEngine.DSCEngine__BurnAmountExceedsMinted.selector);
         dsce.burnDsc(excessiveBurn);
+        vm.stopPrank();
+    }
+    ///////////////////////////////////////
+    // Deposit and Mint Combined Tests ////
+    ///////////////////////////////////////
+
+    function testDepositCollateralAndMintDsc() public {
+        vm.startPrank(USER);
+        uint256 amountCollateral = 5 ether;
+        uint256 amountDscToMint = 5000e18; // 5000 DSC
+        ERC20Mock(weth).approve(address(dsce), amountCollateral);
+        dsce.depositCollateralAndMintDsc(weth, amountCollateral, amountDscToMint);
+        (uint256 totalDscMinted, uint256 collateralValueInUsd) = dsce.getAccountInformation(USER);
+        uint256 expectedCollateral = dsce.getTokenAmountFromUsd(weth, collateralValueInUsd);
+        assertEq(totalDscMinted, amountDscToMint);
+        assertEq(expectedCollateral, amountCollateral);
         vm.stopPrank();
     }
 }

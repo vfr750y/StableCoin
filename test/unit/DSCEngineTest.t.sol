@@ -8,6 +8,7 @@ import {DecentralizedStableCoin} from "../../src/DecentralizedStableCoin.sol";
 import {DSCEngine} from "../../src/DSCEngine.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
 import {ERC20Mock} from "@openzeppelin/contracts/mocks/ERC20Mock.sol";
+import {MockV3Aggregator} from "../mocks/MockV3Aggregator.sol";
 
 contract DSCEngineTest is Test {
     DeployDSC deployer;
@@ -28,6 +29,12 @@ contract DSCEngineTest is Test {
         (dsc, dsce, helperConfig) = deployer.run();
         (ethUsdPriceFeed, btcUsdPriceFeed, weth,,) = helperConfig.activeNetworkConfig();
         ERC20Mock(weth).mint(USER, STARTING_ERC20_BALANCE);
+        ERC20Mock(weth).mint(LIQUIDATOR, STARTING_ERC20_BALANCE);
+        vm.startPrank(LIQUIDATOR);
+        ERC20Mock(weth).approve(address(dsce), STARTING_ERC20_BALANCE);
+        dsce.depositCollateral(weth, STARTING_ERC20_BALANCE);
+        dsce.mintDsc(10000e18);
+        vm.stopPrank();
     }
     ///////////////////////////////
     // Constructor Test ///////////
@@ -249,6 +256,35 @@ contract DSCEngineTest is Test {
         dsc.approve(address(dsce), debtToCover);
         vm.expectRevert(DSCEngine.DSCEngine__HealthFactorOk.selector);
         dsce.liquidate(weth, USER, debtToCover);
+        vm.stopPrank();
+    }
+
+    function testCanLiquidateUser() public depositedCollateral {
+        vm.startPrank(USER);
+        // Mint DSC to break health factor
+        uint256 amountDscToMint = 10000e18;
+        dsc.approve(address(dsce), amountDscToMint);
+        dsce.mintDsc(amountDscToMint);
+        vm.stopPrank();
+
+        // Simulate price drop to break health factor (e.g., WETH price to $1000)
+        vm.startPrank(address(this));
+        MockV3Aggregator wethPriceFeed = MockV3Aggregator(ethUsdPriceFeed);
+        wethPriceFeed.updateAnswer(1000e8); // WETH = $1000
+        vm.stopPrank();
+
+        // switch to liquidator user
+        vm.startPrank(LIQUIDATOR);
+        uint256 debtToCover = 10000e18;
+        dsc.approve(address(dsce), debtToCover);
+        uint256 initialLiquidatorWeth = ERC20Mock(weth).balanceOf(LIQUIDATOR);
+        dsce.liquidate(weth, USER, debtToCover);
+        uint256 finalLiquidatorWeth = ERC20Mock(weth).balanceOf(LIQUIDATOR);
+        // 5000 DSC = 5000 / 2000 = 2.5 ETH + 10 % bonus = 2.75 ETH
+        uint256 expectedWethReceived = (debtToCover * 1e18 / 2000e8 * 110) / 100;
+        assertEq(finalLiquidatorWeth - initialLiquidatorWeth, expectedWethReceived);
+        (uint256 totalDscMinted,) = dsce.getAccountInformation(USER);
+        assertEq(totalDscMinted, amountDscToMint - debtToCover);
         vm.stopPrank();
     }
 }

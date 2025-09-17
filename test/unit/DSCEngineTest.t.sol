@@ -316,4 +316,23 @@ contract DSCEngineTest is Test {
         assertEq(totalDscMinted, amountDscToMint - debtToCover);
         vm.stopPrank();
     }
+
+    function testGetHealthFactor() public depositedCollateral {
+        vm.startPrank(USER);
+        uint256 amountDscToMint = 5000e18; // 5000 DSC
+        dsc.approve(address(dsce), amountDscToMint);
+        dsce.mintDsc(amountDscToMint);
+        // Collateral = 10 ETH * 2000 USD = 20,000 USD
+        // Adjusted = 20,000 * 50% = 10,000 USD
+        // Health factor = (10,000 * 1e18) / 5000 = 2e18
+        uint256 healthFactor = dsce.getHealthFactor(USER);
+        assertEq(healthFactor, 2e18);
+        vm.stopPrank();
+    }
+
+    function testHealthFactorWhenNoDscMinted() public depositedCollateral {
+        // No DSC minted, health factor should be "infinite" (max uint256 in practice)
+        uint256 healthFactor = dsce.getHealthFactor(USER);
+        assertEq(healthFactor, type(uint256).max);
+    }
 }

@@ -217,4 +217,24 @@ contract DSCEngineTest is Test {
         assertEq(expectedCollateral, amountCollateral);
         vm.stopPrank();
     }
+
+    /////////////////////////////
+    // Redeem and Burn Tests ////
+    /////////////////////////////
+
+    function testRedeemCollateralForDsc() public depositedCollateral {
+        vm.startPrank(USER);
+        uint256 amountDscToMint = 1000e18;
+        dsc.approve(address(dsce), amountDscToMint);
+        dsce.mintDsc(amountDscToMint);
+        uint256 amountCollateralToRedeem = 2 ether;
+        uint256 amountDscToBurn = 400e18;
+        dsc.approve(address(dsce), amountDscToBurn);
+        dsce.redeemCollateralForDsc(weth, amountCollateralToRedeem, amountDscToBurn);
+        (uint256 totalDscMinted, uint256 collateralValueInUsd) = dsce.getAccountInformation(USER);
+        uint256 expectedCollateral = dsce.getTokenAmountFromUsd(weth, collateralValueInUsd);
+        assertEq(totalDscMinted, amountDscToMint - amountDscToBurn);
+        assertEq(expectedCollateral, AMOUNT_COLLATERAL - amountCollateralToRedeem);
+        vm.stopPrank();
+    }
 }

@@ -29,10 +29,10 @@ contract DSCEngineTest is Test {
         (dsc, dsce, helperConfig) = deployer.run();
         (ethUsdPriceFeed, btcUsdPriceFeed, weth,,) = helperConfig.activeNetworkConfig();
         ERC20Mock(weth).mint(USER, STARTING_ERC20_BALANCE);
-        ERC20Mock(weth).mint(LIQUIDATOR, STARTING_ERC20_BALANCE);
+        ERC20Mock(weth).mint(LIQUIDATOR, STARTING_ERC20_BALANCE * 2); // Increase to 20 ETH
         vm.startPrank(LIQUIDATOR);
-        ERC20Mock(weth).approve(address(dsce), STARTING_ERC20_BALANCE);
-        dsce.depositCollateral(weth, STARTING_ERC20_BALANCE);
+        ERC20Mock(weth).approve(address(dsce), STARTING_ERC20_BALANCE * 2);
+        dsce.depositCollateral(weth, STARTING_ERC20_BALANCE * 2); // Deposit 20 ETH
         dsce.mintDsc(10000e18);
         vm.stopPrank();
     }
@@ -280,8 +280,37 @@ contract DSCEngineTest is Test {
         uint256 initialLiquidatorWeth = ERC20Mock(weth).balanceOf(LIQUIDATOR);
         dsce.liquidate(weth, USER, debtToCover);
         uint256 finalLiquidatorWeth = ERC20Mock(weth).balanceOf(LIQUIDATOR);
-        // 5000 DSC = 5000 / 2000 = 2.5 ETH + 10 % bonus = 2.75 ETH
-        uint256 expectedWethReceived = (debtToCover * 1e18 / 2000e8 * 110) / 100;
+
+        // Expect the liquidator to receive up to 10 ETH (user's entire collateral)
+        uint256 expectedWethReceived = 10e18; // User's full collateral
+        assertEq(finalLiquidatorWeth - initialLiquidatorWeth, expectedWethReceived);
+        (uint256 totalDscMinted,) = dsce.getAccountInformation(USER);
+        // Expect all DSC to be burned
+        uint256 expectedDscBurned = 10000e18; // All user DSC burned
+        assertEq(totalDscMinted, 0); // totalDscMinted = amountDscToMint - expectedDscBurned
+        vm.stopPrank();
+    }
+
+    function testPartialLiquidation() public depositedCollateral {
+        vm.startPrank(USER);
+        uint256 amountDscToMint = 6000e18;
+        dsc.approve(address(dsce), amountDscToMint);
+        dsce.mintDsc(amountDscToMint);
+        vm.stopPrank();
+
+        vm.startPrank(address(this));
+        MockV3Aggregator wethPriceFeed = MockV3Aggregator(ethUsdPriceFeed);
+        wethPriceFeed.updateAnswer(1000e8); // WETH = $1,000
+        vm.stopPrank();
+
+        vm.startPrank(LIQUIDATOR);
+        uint256 debtToCover = 3000e18;
+        dsc.approve(address(dsce), debtToCover);
+        uint256 initialLiquidatorWeth = ERC20Mock(weth).balanceOf(LIQUIDATOR);
+        dsce.liquidate(weth, USER, debtToCover);
+        uint256 finalLiquidatorWeth = ERC20Mock(weth).balanceOf(LIQUIDATOR);
+
+        uint256 expectedWethReceived = (3000e18 * 1e18 / (1000e8 * 1e10)) * 110 / 100; // 5.5 ETH
         assertEq(finalLiquidatorWeth - initialLiquidatorWeth, expectedWethReceived);
         (uint256 totalDscMinted,) = dsce.getAccountInformation(USER);
         assertEq(totalDscMinted, amountDscToMint - debtToCover);

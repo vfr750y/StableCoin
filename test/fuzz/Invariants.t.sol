@@ -5,7 +5,7 @@
 // 2. The getter view functions should never revert
 
 pragma solidity ^0.8.18;
-/*
+
 import {Test} from "forge-std/Test.sol";
 import {StdInvariant} from "forge-std/StdInvariant.sol";
 import {DeployDSC} from "./../../script/DeployDsc.s.sol";
@@ -13,9 +13,8 @@ import {DSCEngine} from "./../../src/DSCEngine.sol";
 import {DecentralizedStableCoin} from "./../../src/DecentralizedStableCoin.sol";
 import {HelperConfig} from "./../../script/HelperConfig.s.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {console} from "forge-std/console.sol";
 
-contract OpenInvariantsTest is StdInvariant, Test {
+contract InvariantsTest is StdInvariant, Test {
     DeployDSC deployer;
     DSCEngine dsce;
     DecentralizedStableCoin dsc;
@@ -24,25 +23,13 @@ contract OpenInvariantsTest is StdInvariant, Test {
     address wbtc;
 
     function setUp() external {
-        console.log("Deploying DeployDSC...");
         deployer = new DeployDSC();
-        console.log("Running DeployDSC...");
         (dsc, dsce, config) = deployer.run();
-        console.log("DSC address:", address(dsc));
-        console.log("DSCEngine address:", address(dsce));
-        console.log("HelperConfig address:", address(config));
         (,, weth, wbtc,) = config.activeNetworkConfig();
-        console.log("WETH address:", weth);
-        console.log("WBTC address:", wbtc);
-        require(weth != address(0), "WETH address is zero");
-        require(wbtc != address(0), "WBTC address is zero");
         targetContract(address(dsce));
     }
 
-    function invariant_basicSetup() public view {
-        assert(address(dsce) != address(0));
-    }
-    /*  function invariant_protocolMustHaveMoreValueThanTotalSupply() public view {
+    function invariant_protocolMustHaveMoreValueThanTotalSupply() public view {
         // get the value of all the collateral in the protocol
         // comper it a to all the debt (dsc)
         uint256 totalSupply = dsc.totalSupply();
@@ -54,6 +41,4 @@ contract OpenInvariantsTest is StdInvariant, Test {
 
         assert(wethValue + wbtcValue > totalSupply);
     }
-
-   
-} */
+}

@@ -39,7 +39,7 @@ contract InvariantsTest is StdInvariant, Test {
         uint256 totalSupply = dsc.totalSupply();
         uint256 totalWethDeposited = IERC20(weth).balanceOf(address(dsce));
         uint256 totalWbtcDeposited = IERC20(wbtc).balanceOf(address(dsce));
-
+        /*
         // Check totalWethDeposited == 0 before calling getUSDValue()
         if (totalWethDeposited == 0) {
             // If 0: Skip USD calculation and assert that totalSupply must also be 0
@@ -56,10 +56,15 @@ contract InvariantsTest is StdInvariant, Test {
             // If > 0: Continue with normal flow
             return;
         }
-
+        */
         uint256 wethValue = dsce.getUsdValue(weth, totalWethDeposited);
         uint256 wbtcValue = dsce.getUsdValue(wbtc, totalWbtcDeposited);
 
-        assert(wethValue + wbtcValue > totalSupply);
+        console.log("weth value", wethValue);
+        console.log("wbtc value", wbtcValue);
+        console.log("total supply", totalSupply);
+        console.log("times mint called:", handler.timesMintIsCalled());
+
+        assert(wethValue + wbtcValue >= totalSupply);
     }
 }

@@ -1,7 +1,3 @@
-This `README.md` is designed for the **StableCoin** project by `vfr750y`. Based on the repository's structure (which follows a decentralized, over-collateralized model similar to MakerDAO or Liquity), this file provides a professional overview, technical architecture, and setup guide.
-
----
-
 # Decentralized Stablecoin (DSC)
 
 A robust, decentralized, and over-collateralized stablecoin system pegged to the USD. This project implements a "mint-and-burn" mechanism where users can deposit exogenous assets (like wETH or wBTC) as collateral to mint a stable currency ($1.00 peg).

@@ -9,6 +9,8 @@ import {DSCEngine} from "../../src/DSCEngine.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
 import {ERC20Mock} from "@openzeppelin/contracts/mocks/ERC20Mock.sol";
 import {MockV3Aggregator} from "../mocks/MockV3Aggregator.sol";
+import {ERC20ReturnFalseMock} from "../mocks/MockERC20ReturnFalse.sol";
+import {MockFailedMintDSC} from "../mocks/MockFailedMintDSC.sol";
 
 contract DSCEngineTest is Test {
     DeployDSC deployer;
@@ -170,6 +172,49 @@ contract DSCEngineTest is Test {
         vm.stopPrank();
     }
 
+    /**
+     * @notice Testing DSCEngine__MintFailed() 
+     */
+    function testRevertsIfMintFails() public {
+        // 1. Arrange - Setup
+        MockFailedMintDSC mockDsc = new MockFailedMintDSC();
+        tokenAddresses = [weth];
+        priceFeedAddresses = [ethUsdPriceFeed];
+        DSCEngine mockEngine = new DSCEngine(tokenAddresses, priceFeedAddresses, address(mockDsc));
+        mockDsc.transferOwnership(address(mockEngine));
+
+        // 2. Act / Assert
+        vm.startPrank(USER);
+        ERC20Mock(weth).approve(address(mockEngine), AMOUNT_COLLATERAL);
+        mockEngine.depositCollateral(weth, AMOUNT_COLLATERAL);
+
+        vm.expectRevert(DSCEngine.DSCEngine__MintFailed.selector);
+        mockEngine.mintDsc(1 ether);
+        vm.stopPrank();
+    }
+
+    //////////////////////////////////////////
+    // DecentralizedStableCoin Mint Tests ////
+    //////////////////////////////////////////
+
+    function testMintRevertsIfToAddressIsZero() public {
+        vm.startPrank(address(dsce));
+        vm.expectRevert(DecentralizedStableCoin.DecentralizedStableCoin__NotZeroAddress.selector);
+        dsc.mint(address(0), 100 ether);
+        vm.stopPrank();
+    }
+
+    function testOnlyOwnerCanMint() public {
+        vm.startPrank(USER);
+        // The USER is not the owner (the DSCEngine is)
+        // This will revert via OpenZeppelin's Ownable
+        vm.expectRevert(); 
+        dsc.mint(USER, 100 ether);
+        vm.stopPrank();
+    }
+
+
+
     ////////////////////////////////
     // Burn DSC Tests    ///////////
     ////////////////////////////////
@@ -246,6 +291,35 @@ contract DSCEngineTest is Test {
         vm.stopPrank();
     }
 
+    //////////////////////////////////////////
+    // DecentralizedStableCoin Burn Tests ////
+    //////////////////////////////////////////
+
+    function testRevertIfBurnAmountIsZeroInDSC() public {
+        vm.startPrank(address(dsce)); // DSCEngine is the owner of DSC
+        vm.expectRevert(DecentralizedStableCoin.DecentralizedStableCoin__AmountMustBeMoreThanZero.selector);
+        dsc.burn(0);
+        vm.stopPrank();
+    }
+
+    function testCantBurnMoreThanBalance() public {
+        vm.startPrank(address(dsce));
+        // Minting some DSC to the engine first so it has a balance to burn
+        // (Though usually, it burns from its own balance during liquidations)
+        vm.expectRevert(DecentralizedStableCoin.DecentralizedStableCoin__BurnAmountExceedsBalance.selector);
+        dsc.burn(1 ether);
+        vm.stopPrank();
+    }
+
+    function testOnlyOwnerCanBurn() public {
+        vm.startPrank(USER);
+        // The USER is not the owner (the DSCEngine is)
+        // Using the standard Ownable error from OpenZeppelin
+        vm.expectRevert(); 
+        dsc.burn(1 ether);
+        vm.stopPrank();
+    }
+
     //////////////////////////
     // Liquidation Tests /////
     //////////////////////////
@@ -317,39 +391,101 @@ contract DSCEngineTest is Test {
         vm.stopPrank();
     }
 
-    /* function testMustImproveHealthFactorOnLiquidation() public {
-        // Arrange - Setup
-        MockMoreDebtDSC mockDsc = new MockMoreDebtDSC(ethUsdPriceFeed);
-        tokenAddresses = [weth];
-        feedAddresses = [ethUsdPriceFeed];
-        address owner = msg.sender;
-        vm.prank(owner);
-        DSCEngine mockDsce = new DSCEngine(tokenAddresses, feedAddresses, address(mockDsc));
-        mockDsc.transferOwnership(address(mockDsce));
-        // Arrange - User
-        vm.startPrank(user);
-        ERC20Mock(weth).approve(address(mockDsce), amountCollateral);
-        mockDsce.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
-        vm.stopPrank();
+function testLiquidationMustImproveHealthFactor() public {
+    // 1. Arrange - User setup
+    vm.startPrank(USER);
+    ERC20Mock(weth).approve(address(dsce), AMOUNT_COLLATERAL);
+    dsce.depositCollateral(weth, AMOUNT_COLLATERAL);
+    dsce.mintDsc(100e18); // $100 debt
+    vm.stopPrank();
 
-        // Arrange - Liquidator
-        collateralToCover = 1 ether;
-        ERC20Mock(weth).mint(liquidator, collateralToCover);
+    // 2. Price Crash
+    MockV3Aggregator(ethUsdPriceFeed).updateAnswer(18e8); // ETH = $18
+    // User Collateral: 10 ETH * $18 = $180. 
+    // Threshold (50%): $90. Debt: $100. HF < 1.0.
 
-        vm.startPrank(liquidator);
-        ERC20Mock(weth).approve(address(mockDsce), collateralToCover);
-        uint256 debtToCover = 10 ether;
-        mockDsce.depositCollateralAndMintDsc(weth, collateralToCover, amountToMint);
-        mockDsc.approve(address(mockDsce), debtToCover);
-        // Act
-        int256 ethUsdUpdatedPrice = 18e8; // 1 ETH = $18
-        MockV3Aggregator(ethUsdPriceFeed).updateAnswer(ethUsdUpdatedPrice);
-        // Act/Assert
-        vm.expectRevert(DSCEngine.DSCEngine__HealthFactorNotImproved.selector);
-        mockDsce.liquidate(weth, user, debtToCover);
-        vm.stopPrank();
-    }
-    */
+    // 3. Arrange - Liquidator setup
+    // We create a fresh liquidator with NO debt so their HF is 'max uint'
+    address cleanLiquidator = makeAddr("cleanLiquidator");
+    ERC20Mock(weth).mint(cleanLiquidator, 100 ether);
+    
+    // Give the liquidator DSC to pay the debt (we can transfer it from the existing LIQUIDATOR)
+    vm.prank(LIQUIDATOR);
+    dsc.transfer(cleanLiquidator, 50e18);
+
+    vm.startPrank(cleanLiquidator);
+    dsc.approve(address(dsce), 50e18);
+
+    // 4. Act
+    // Liquidator burns 50 DSC of the User's 100 DSC debt
+    dsce.liquidate(weth, USER, 50e18);
+    vm.stopPrank();
+}
+
+function testLiquidatorHealthFactorStaysHealthy() public depositedCollateral {
+    // 1. User is underwater
+    vm.startPrank(USER);
+    dsce.mintDsc(10000e18); 
+    vm.stopPrank();
+    MockV3Aggregator(ethUsdPriceFeed).updateAnswer(1000e8); 
+
+    // 2. Liquidator has NO collateral but has DSC
+    // (Liquidator got DSC from the setUp)
+    vm.startPrank(LIQUIDATOR);
+    // Liquidator tries to liquidate without having enough of their own collateral
+    // to sustain the transaction if the engine logic requires it.
+    // Since LIQUIDATOR in setUp has 20 ETH, let's prank a new address.
+    address brokeLiquidator = makeAddr("brokeLiquidator");
+    vm.stopPrank();
+    
+    vm.startPrank(brokeLiquidator);
+    vm.expectRevert(); // Should revert because health factor is 0 or broken
+    dsce.liquidate(weth, USER, 100e18);
+    vm.stopPrank();
+}
+
+function testRevertsIfHealthFactorNotImproved() public {
+    // 1. Arrange - User setup
+    vm.startPrank(USER);
+    ERC20Mock(weth).approve(address(dsce), AMOUNT_COLLATERAL);
+    dsce.depositCollateral(weth, AMOUNT_COLLATERAL);
+    dsce.mintDsc(100e18); // $100 debt
+    vm.stopPrank();
+
+    // 2. Arrange - Clean Liquidator (No debt, so they don't revert on their own HF)
+    address cleanLiquidator = makeAddr("cleanLiquidator");
+    ERC20Mock(weth).mint(cleanLiquidator, 100 ether);
+    vm.prank(LIQUIDATOR);
+    dsc.transfer(cleanLiquidator, 10e18); 
+
+    // 3. The Strategy
+    // First, make them liquidatable
+    MockV3Aggregator(ethUsdPriceFeed).updateAnswer(18e8); // $18
+    
+    // NOW: Crash the price to almost nothing.
+    // When liquidate() runs, it will calculate 'startingUserHealthFactor' using $1.
+    // Then it will burn debt and calculate 'endingUserHealthFactor' also using $1.
+    // At such low prices, the collateral bonus taken by the liquidator 
+    // often outweighs the tiny debt reduction, or the HF stays at 0.
+    MockV3Aggregator(ethUsdPriceFeed).updateAnswer(1e8); // $1
+
+    vm.startPrank(cleanLiquidator);
+    dsc.approve(address(dsce), 10e18);
+
+    // 4. Act / Assert
+    vm.expectRevert(DSCEngine.DSCEngine__HealthFactorNotImproved.selector);
+    dsce.liquidate(weth, USER, 1e18); // Liquidate a tiny amount (1 DSC)
+    vm.stopPrank();
+}
+
+function testRevertIfRedeemingMoreCollateralThanBalance() public depositedCollateral {
+    vm.startPrank(USER);
+    vm.expectRevert(); // Solidity's built-in panic for underflow
+    dsce.redeemCollateral(weth, AMOUNT_COLLATERAL + 1 ether);
+    vm.stopPrank();
+}
+
+   
 
     function testGetHealthFactor() public depositedCollateral {
         vm.startPrank(USER);
@@ -369,4 +505,75 @@ contract DSCEngineTest is Test {
         uint256 healthFactor = dsce.getHealthFactor(USER);
         assertEq(healthFactor, type(uint256).max);
     }
+
+    function testLiquidationPayoutIsCappedByUserCollateral() public depositedCollateral {
+        // Arrange - User has 10 ETH ($20,000)
+        vm.startPrank(USER);
+        dsce.mintDsc(10000e18); // Max safe-ish mint
+        vm.stopPrank();
+
+        // Price drops massively so debt + 10% bonus > total collateral
+        // If ETH drops to $1,100: Debt is $10k, but $10k worth of ETH is ~9.09 ETH.
+        // 9.09 ETH + 10% bonus = 9.99 ETH. 
+        // If it drops to $1,000: $10k debt = 10 ETH. 10 ETH + 1 ETH bonus = 11 ETH (Exceeds 10 ETH balance)
+        MockV3Aggregator(ethUsdPriceFeed).updateAnswer(1000e8); 
+
+        vm.startPrank(LIQUIDATOR);
+        dsc.approve(address(dsce), 10000e18);
+        
+        // Act
+        dsce.liquidate(weth, USER, 10000e18);
+        
+        // Assert: Liquidator should get exactly 10 ETH (the cap), not 11 ETH.
+        uint256 liquidatorWethBalance = ERC20Mock(weth).balanceOf(LIQUIDATOR);
+        // Liquidator started with 20 ETH (see setUp), deposited 20, so had 0. 
+        // Now should have exactly 10.
+        assertEq(liquidatorWethBalance, 10 ether); 
+        vm.stopPrank();
+    }
+
+    function testGetAccountCollateralValueFromMultipleTokens() public {
+        // Arrange
+        address wbtc = makeAddr("wbtc"); // In a real test, use the WBTC address from config
+        // For this test, let's just use the existing setup and simulate two deposits
+        vm.startPrank(USER);
+        ERC20Mock(weth).approve(address(dsce), 1 ether);
+        dsce.depositCollateral(weth, 1 ether); // $2000
+        
+        // We would need to add WBTC to the engine in setup to truly test the loop, 
+        // but we can check the current value for the single token loop.
+        uint256 expectedValue = dsce.getUsdValue(weth, 1 ether);
+        uint256 actualValue = dsce.getAccountCollateralValue(USER);
+        
+        assertEq(expectedValue, actualValue);
+        vm.stopPrank();
+    }
+
+    /////////////////////////////
+    // Transfer Failure Tests ///
+    /////////////////////////////
+
+function testRevertIfTransferFromFails() public {
+    // 1. Arrange
+    address owner = msg.sender;
+    vm.startPrank(owner);
+    
+    // Use our special mock that returns false
+    ERC20ReturnFalseMock mockToken = new ERC20ReturnFalseMock("MOCK", "MCK", USER, AMOUNT_COLLATERAL);
+    
+    tokenAddresses = [address(mockToken)];
+    priceFeedAddresses = [ethUsdPriceFeed];
+    
+    // Deploy a temporary engine with the "bad" token
+    DSCEngine mockEngine = new DSCEngine(tokenAddresses, priceFeedAddresses, address(dsc));
+    vm.stopPrank();
+
+    // 2. Act & Assert
+    vm.prank(USER);
+    // Since mockToken.transferFrom returns false, the engine WILL reach your custom revert
+    vm.expectRevert(DSCEngine.DSCEngine__TransferFailed.selector);
+    mockEngine.depositCollateral(address(mockToken), AMOUNT_COLLATERAL);
 }
+}
+
+

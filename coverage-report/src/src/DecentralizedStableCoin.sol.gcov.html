@@ -37,7 +37,7 @@
           </tr>
           <tr>
             <td class="headerItem">Test Date:</td>
-            <td class="headerValue">2026-01-14 20:35:50</td>
+            <td class="headerValue">2026-01-14 21:27:27</td>
             <td></td>
             <td class="headerItem">Functions:</td>
             <td class="headerCovTableEntryHi">100.0&nbsp;%</td>
@@ -128,15 +128,15 @@
 <span id="L66"><span class="lineNum">      66</span> <span class="tlaGNC">           7 :         super.burn(_amount);</span></span>
 <span id="L67"><span class="lineNum">      67</span>              :     }</span>
 <span id="L68"><span class="lineNum">      68</span>              : </span>
-<span id="L69"><span class="lineNum">      69</span> <span class="tlaGNC">       10526 :     function mint(address _to, uint256 _amount) external onlyOwner returns (bool) {</span></span>
-<span id="L70"><span class="lineNum">      70</span> <span class="tlaGNC">       10525 :         if (_to == address(0)) {</span></span>
+<span id="L69"><span class="lineNum">      69</span> <span class="tlaGNC">       10540 :     function mint(address _to, uint256 _amount) external onlyOwner returns (bool) {</span></span>
+<span id="L70"><span class="lineNum">      70</span> <span class="tlaGNC">       10539 :         if (_to == address(0)) {</span></span>
 <span id="L71"><span class="lineNum">      71</span> <span class="tlaGNC">           1 :             revert DecentralizedStableCoin__NotZeroAddress();</span></span>
 <span id="L72"><span class="lineNum">      72</span>              :         }</span>
-<span id="L73"><span class="lineNum">      73</span> <span class="tlaGNC">       10524 :         if (_amount &lt;= 0) {</span></span>
+<span id="L73"><span class="lineNum">      73</span> <span class="tlaGNC">       10538 :         if (_amount &lt;= 0) {</span></span>
 <span id="L74"><span class="lineNum">      74</span> <span class="tlaUNC tlaBgUNC">           0 :             revert DecentralizedStableCoin__AmountMustBeMoreThanZero();</span></span>
 <span id="L75"><span class="lineNum">      75</span>              :         }</span>
-<span id="L76"><span class="lineNum">      76</span> <span class="tlaGNC tlaBgGNC">       10524 :         _mint(_to, _amount);</span></span>
-<span id="L77"><span class="lineNum">      77</span> <span class="tlaGNC">       10524 :         return true;</span></span>
+<span id="L76"><span class="lineNum">      76</span> <span class="tlaGNC tlaBgGNC">       10538 :         _mint(_to, _amount);</span></span>
+<span id="L77"><span class="lineNum">      77</span> <span class="tlaGNC">       10538 :         return true;</span></span>
 <span id="L78"><span class="lineNum">      78</span>              :     }</span>
 <span id="L79"><span class="lineNum">      79</span>              : }</span>
         </pre>

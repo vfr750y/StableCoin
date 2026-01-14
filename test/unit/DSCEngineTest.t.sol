@@ -11,6 +11,9 @@ import {ERC20Mock} from "@openzeppelin/contracts/mocks/ERC20Mock.sol";
 import {MockV3Aggregator} from "../mocks/MockV3Aggregator.sol";
 import {ERC20ReturnFalseMock} from "../mocks/MockERC20ReturnFalse.sol";
 import {MockFailedMintDSC} from "../mocks/MockFailedMintDSC.sol";
+import {MockFailedTransferDSC} from "../mocks/MockFailedTransferDSC.sol";
+import {MockFailedTransferWETH} from "../mocks/MockFailedTransferWETH.sol";
+
 
 contract DSCEngineTest is Test {
     DeployDSC deployer;
@@ -574,6 +577,228 @@ function testRevertIfTransferFromFails() public {
     vm.expectRevert(DSCEngine.DSCEngine__TransferFailed.selector);
     mockEngine.depositCollateral(address(mockToken), AMOUNT_COLLATERAL);
 }
+
+function testRevertsIfTransferFromFailsInBurn() public {
+    // 1. Arrange - Setup with a DSC mock that returns false on transfer
+    vm.startPrank(msg.sender);
+    MockFailedTransferDSC mockDsc = new MockFailedTransferDSC();
+    tokenAddresses = [weth];
+    priceFeedAddresses = [ethUsdPriceFeed];
+    
+    DSCEngine mockEngine = new DSCEngine(tokenAddresses, priceFeedAddresses, address(mockDsc));
+    mockDsc.transferOwnership(address(mockEngine));
+    vm.stopPrank();
+
+    // 2. Arrange - User setup
+    vm.startPrank(USER);
+    ERC20Mock(weth).mint(USER, AMOUNT_COLLATERAL); // Ensure user has WETH
+    ERC20Mock(weth).approve(address(mockEngine), AMOUNT_COLLATERAL);
+    
+    // Deposit and Mint so the user has a "debt" balance in the engine
+    mockEngine.depositCollateral(weth, AMOUNT_COLLATERAL);
+    mockEngine.mintDsc(1 ether);
+    
+    // 3. Act / Assert
+    // Approve the engine to take the DSC back (standard flow)
+    mockDsc.approve(address(mockEngine), 1 ether);
+    
+    // This calls _burnDsc -> transferFrom -> returns false -> Reverts DSCEngine__TransferFailed
+    vm.expectRevert(DSCEngine.DSCEngine__TransferFailed.selector);
+    mockEngine.burnDsc(1 ether);
+    vm.stopPrank();
+}
+
+function testRevertsIfTransferFailsInRedeemCollateral() public {
+    // 1. Arrange - Setup with a collateral mock that returns false on transfer
+    address owner = msg.sender;
+    vm.startPrank(owner);
+    
+    MockFailedTransferWETH mockWeth = new MockFailedTransferWETH();
+    tokenAddresses = [address(mockWeth)];
+    priceFeedAddresses = [ethUsdPriceFeed];
+    
+    // Deploy engine with the "bad" collateral
+    DSCEngine mockEngine = new DSCEngine(tokenAddresses, priceFeedAddresses, address(dsc));
+    vm.stopPrank();
+
+    // 2. Arrange - User setup
+    vm.startPrank(USER);
+    mockWeth.mint(USER, AMOUNT_COLLATERAL);
+    mockWeth.approve(address(mockEngine), AMOUNT_COLLATERAL);
+    mockEngine.depositCollateral(address(mockWeth), AMOUNT_COLLATERAL);
+    
+    // 3. Act / Assert
+    // When we redeem, the engine updates its internal balance and then calls transfer()
+    // Since mockWeth.transfer returns false, it should revert
+    vm.expectRevert(DSCEngine.DSCEngine__TransferFailed.selector);
+    mockEngine.redeemCollateral(address(mockWeth), AMOUNT_COLLATERAL);
+    vm.stopPrank();
+}
+
+//////////////////////////////////////////
+//     getter tests                     //
+//////////////////////////////////////////
+
+function testGetAccountCollateralValue() public depositedCollateral {
+    // 1. Arrange
+    // In your 'depositedCollateral' modifier, USER deposits 10 ether of WETH.
+    // In HelperConfig, WETH price is usually mocked at $2,000.
+    // Expected: 10 * 2000 = 20,000 USD (in 1e18 precision)
+    
+    uint256 expectedValue = dsce.getUsdValue(weth, AMOUNT_COLLATERAL);
+
+    // 2. Act
+    uint256 actualValue = dsce.getAccountCollateralValue(USER);
+
+    // 3. Assert
+    assertEq(actualValue, expectedValue);
+}
+/*
+function testGetAccountCollateralValueWithMultipleTokens() public {
+    // 1. Arrange - Setup
+    // We already have WETH from setUp, let's create a real WBTC mock
+    ERC20Mock wbtc = new ERC20Mock("WBTC", "WBTC", USER, AMOUNT_COLLATERAL);
+    
+    // Create the arrays for the new engine
+    address[] memory tokenAddresses = new address[](2);
+    address[] memory feedAddresses = new address[](2);
+    
+    tokenAddresses[0] = weth;
+    tokenAddresses[1] = address(wbtc);
+    feedAddresses[0] = ethUsdPriceFeed;
+    feedAddresses[1] = btcUsdPriceFeed;
+
+    // Deploy a temporary engine with both tokens
+    DSCEngine multiEngine = new DSCEngine(tokenAddresses, feedAddresses, address(dsc));
+
+    vm.startPrank(USER);
+    // Deposit 1 ETH ($2000)
+    ERC20Mock(weth).approve(address(multiEngine), 1 ether);
+    multiEngine.depositCollateral(weth, 1 ether);
+
+    // Deposit 1 BTC ($1000 - assuming BTC price in your mock is 1000)
+    wbtc.approve(address(multiEngine), 1 ether);
+    multiEngine.depositCollateral(address(wbtc), 1 ether);
+    vm.stopPrank();
+
+    // 2. Act
+    uint256 totalCollateralValue = multiEngine.getAccountCollateralValue(USER);
+
+    // 3. Assert
+    uint256 expectedWethValue = multiEngine.getUsdValue(weth, 1 ether);
+    uint256 expectedWbtcValue = multiEngine.getUsdValue(address(wbtc), 1 ether);
+    uint256 expectedTotalValue = expectedWethValue + expectedWbtcValue;
+    
+    assertEq(totalCollateralValue, expectedTotalValue);
+}
+*/
+
+function testGetAccountCollateralValueDirectly() public {
+    // 1. Arrange - Use the existing weth/dsce from setUp
+    vm.startPrank(USER);
+    uint256 amountToDeposit = 1 ether;
+    ERC20Mock(weth).approve(address(dsce), amountToDeposit);
+    dsce.depositCollateral(weth, amountToDeposit);
+    vm.stopPrank();
+
+    // 2. Act
+    // This call must iterate through the loop and hit the return statement
+    uint256 collateralValue = dsce.getAccountCollateralValue(USER);
+
+    // 3. Assert
+    // If the price is $2000, 1 ETH = 2000e18 USD value
+    uint256 expectedValue = dsce.getUsdValue(weth, amountToDeposit);
+    assertEq(collateralValue, expectedValue);
+    assert(collateralValue > 0);
+}
+
+///////////////////////////////////////
+    // getAccountCollateralValue Tests ////
+    ///////////////////////////////////////
+
+    function testGetAccountCollateralValueReturnsZeroIfNoCollateral() public {
+        // Arrange
+        address newUser = makeAddr("noCollateral");
+        // Act
+        uint256 collateralValue = dsce.getAccountCollateralValue(newUser);
+        // Assert
+        assertEq(collateralValue, 0);
+    }
+
+    function testGetAccountCollateralValueWithSingleToken() public depositedCollateral {
+        // Arrange
+        // depositedCollateral modifier deposits 10 ether of WETH (USER)
+        // ETH_USD price in HelperConfig is 2000e8
+        uint256 expectedValue = dsce.getUsdValue(weth, AMOUNT_COLLATERAL);
+
+        // Act
+        uint256 actualValue = dsce.getAccountCollateralValue(USER);
+
+        // Assert
+        assertEq(actualValue, expectedValue);
+    }
+
+    function testGetAccountCollateralValueWithMultipleTokens() public {
+        // 1. Arrange - We need a second token
+        // We'll use the BTC address/price feed from your active network config
+        (, address btcUsdPriceFeed, address wbtc,,) = helperConfig.activeNetworkConfig();
+        
+        // Use a user with a clean state
+        address multiUser = makeAddr("multiUser");
+        
+        vm.startPrank(multiUser);
+        // Deposit 1 ETH ($2000)
+        ERC20Mock(weth).mint(multiUser, 1 ether);
+        ERC20Mock(weth).approve(address(dsce), 1 ether);
+        dsce.depositCollateral(weth, 1 ether);
+
+        // Deposit 1 BTC ($1000 - typical mock price)
+        ERC20Mock(wbtc).mint(multiUser, 1 ether);
+        ERC20Mock(wbtc).approve(address(dsce), 1 ether);
+        dsce.depositCollateral(wbtc, 1 ether);
+        vm.stopPrank();
+
+        // 2. Act
+        uint256 totalCollateralValue = dsce.getAccountCollateralValue(multiUser);
+
+        // 3. Assert
+        uint256 expectedWethValue = dsce.getUsdValue(weth, 1 ether);
+        uint256 expectedWbtcValue = dsce.getUsdValue(wbtc, 1 ether);
+        uint256 expectedTotalValue = expectedWethValue + expectedWbtcValue;
+
+        assertEq(totalCollateralValue, expectedTotalValue);
+    }
+
+function testGetPrecision() public {
+    uint256 expectedPrecision = 1e18;
+    uint256 actualPrecision = dsce.getPrecision();
+    assertEq(actualPrecision, expectedPrecision);
+}
+
+function testGetAdditionalFeedPrecision() public {
+    uint256 expectedPrecision = 1e10;
+    uint256 actualPrecision = dsce.getAdditionalFeedPrecision();
+    assertEq(actualPrecision, expectedPrecision);
+}
+
+function testGetLiquidationBonus() public {
+    uint256 expectedPrecision = 10;
+    uint256 actualPrecision = dsce.getLiquidationBonus();
+    assertEq(actualPrecision, expectedPrecision);
+}
+
+function testGetMinHealthFactor() public {
+    uint256 expectedPrecision = 1e18;
+    uint256 actualPrecision = dsce.getMinHealthFactor();
+    assertEq(actualPrecision, expectedPrecision);
+}
+
+function testGetDsc() public {
+    address dscAddress = dsce.getDsc();
+    assertEq(dscAddress, address(dsc));
+}
+
+
 }
 
 
